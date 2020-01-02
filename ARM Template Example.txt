@@ -1,0 +1,152 @@
+# A Resource Manager template can contain the following sections.
+
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "",
+    "parameters": {  },
+    "variables": {  },
+    "functions": [  ],
+    "resources": [  ],
+    "outputs": {  }
+}
+
+# Here's an example that illustrates two parameters – one for a VM's username and one for its password.
+
+"parameters": {
+  "adminUsername": {
+    "type": "string",
+    "metadata": {
+      "description": "Username for the Virtual Machine."
+    }
+  },
+  "adminPassword": {
+    "type": "securestring",
+    "metadata": {
+      "description": "Password for the Virtual Machine."
+    }
+  }
+}
+
+# Here's an example that illustrates a few variables that describe networking features for a VM.
+
+"variables": {
+  "nicName": "myVMNic",
+  "addressPrefix": "10.0.0.0/16",
+  "subnetName": "Subnet",
+  "subnetPrefix": "10.0.0.0/24",
+  "publicIPAddressName": "myPublicIP",
+  "virtualNetworkName": "MyVNET"
+}
+
+# Here's an example that creates a function to create a unique name that could be used when creating resources that have globally unique naming requirements.
+
+"functions": [
+  {
+    "namespace": "contoso",
+    "members": {
+      "uniqueName": {
+        "parameters": [
+          {
+            "name": "namePrefix",
+            "type": "string"
+          }
+        ],
+        "output": {
+          "type": "string",
+          "value": "[concat(toLower(parameters('namePrefix')), uniqueString(resourceGroup().id))]"
+        }
+      }
+    }
+  }
+],
+
+# Here's an example that creates a public IP address resource.
+
+{
+  "type": "Microsoft.Network/publicIPAddresses",
+  "name": "[variables('publicIPAddressName')]",
+  "location": "[parameters('location')]",
+  "apiVersion": "2018-08-01",
+  "properties": {
+    "publicIPAllocationMethod": "Dynamic",
+    "dnsSettings": {
+      "domainNameLabel": "[parameters('dnsLabelPrefix')]"
+    }
+  }
+}
+
+
+# This is where you define any information you'd like to receive when the template runs. For example, you might want to receive your VM's IP address or FQDN – information you do not know until the deployment runs. Here's an example that illustrates an output named "hostname". The FQDN value is read from the VM's public IP address settings.
+
+"outputs": {
+  "hostname": {
+    "type": "string",
+    "value": "[reference(variables('publicIPAddressName')).dnsSettings.fqdn]"
+  }
+}
+
+
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "",
+    "parameters": { 
+        "adminUsername": {
+        "type": "string",
+        "metadata": {
+            "description": "Username for the Virtual Machine."
+        }
+    },
+    "adminPassword": {
+        "type": "securestring",
+        "metadata": {
+            "description": "Password for the Virtual Machine."
+        }
+    },
+    "variables": { 
+        "nicName": "myVMNic",
+        "addressPrefix": "10.0.0.0/16",
+        "subnetName": "Subnet",
+        "subnetPrefix": "10.0.0.0/24",
+        "publicIPAddressName": "myPublicIP",
+        "virtualNetworkName": "MyVNET"
+     },
+    "functions": [
+        {
+            "namespace": "contoso",
+            "members": {
+                "uniqueName": {
+                    "parameters": [
+                        {
+                            "name": "namePrefix",
+                            "type": "string"
+                        }
+                    ],
+                    "output": {
+                        "type": "string",
+                        "value": "[concat(toLower(parameters('namePrefix')), uniqueString(resourceGroup().id))]"
+                    }
+                }
+            }
+        }
+    ],
+    "resources": [
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[variables('publicIPAddressName')]",
+            "location": "[parameters('location')]",
+            "apiVersion": "2018-08-01",
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "dnsSettings": {
+                    "domainNameLabel": "[parameters('dnsLabelPrefix')]"
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "hostname": {
+            "type": "string",
+            "value": "[reference(variables('publicIPAddressName')).dnsSettings.fqdn]"
+        }
+    }
+}
