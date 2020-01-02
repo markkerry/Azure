@@ -1,21 +1,18 @@
 https://docs.microsoft.com/en-us/learn/modules/build-azure-vm-templates/4-deploy-a-vm-quickstart-template?pivots=windows-cloud
 
-AzureCLI
+### AzureCLI ###
 
 ## Create RG ##
-
 RESOURCEGROUP=learn-quickstart-vm-rg
 LOCATION=eastus
 az group create --name $RESOURCEGROUP --location $LOCATION
 
 ## Parameters ##
-
 USERNAME=azureuser
 PASSWORD=$(openssl rand -base64 32)
 DNS_LABEL_PREFIX=mydeployment-$RANDOM
 
 ## VALIDATE ##
-
 az group deployment validate \
   --resource-group $RESOURCEGROUP \
   --template-uri "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/master/101-vm-simple-windows/azuredeploy.json" \
@@ -37,8 +34,6 @@ There are many ways generate random passwords. The method you choose depends on 
 The DNS label prefix must be unique. The DNS label prefix begins with "mydeployment" followed by a random number. $RANDOM is a Bash function that generates a random positive whole number.
 
 ## Verify the deployment ##
-
 az group deployment show \
   --name MyDeployment \
   --resource-group $RESOURCEGROUP
-
