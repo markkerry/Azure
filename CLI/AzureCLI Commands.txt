@@ -1,0 +1,126 @@
+# Set the default region
+az configure --defaults location=westeurope
+
+# Set the default resource group
+az configure --defaults group="learn-21b0a14e-1115-4ad6-a107-143dc5759852"
+
+# Create a linux VM
+az vm create \
+  --name support-web-vm01 \
+  --image UbuntuLTS \
+  --size Standard_DS1_v2 \
+  --admin-username azureuser \
+  --generate-ssh-keys
+
+# Attach a data disk
+az vm disk attach \
+  --vm-name support-web-vm01 \
+  --name uploadDataDisk1 \
+  --size-gb 64 \
+  --sku Premium_LRS \
+  --new
+
+# Run az vm show to get your VM's public IP address and save the IP address as a Bash variable.
+ipaddress=$(az vm show \
+  --name support-web-vm01 \
+  --show-details \
+  --query [publicIps] \
+  --o tsv)
+
+echo $ipaddress
+ssh azureuser@$ipaddress lsblk
+yes
+
+# NAME    MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+# sda       8:0    0   30G  0 disk
+# +-sda1    8:1    0 29.9G  0 part /
+# +-sda14   8:14   0    4M  0 part
+# +-sda15   8:15   0  106M  0 part /boot/efi
+# sdb       8:16   0    7G  0 disk
+# +-sdb1    8:17   0    7G  0 part /mnt
+# sdc       8:32   0   64G  0 disk
+# sr0      11:0    1  628K  0 rom
+
+# Partitions the drive /dev/sdc. Creates an ext4 filesystem on the drive. Create the /uploads directory, which we use as our mount point. Attaches the disk to the mount point. Updates /etc/fstab so that the drive is mounted automatically after the system reboots.
+az vm extension set \
+  --vm-name support-web-vm01 \
+  --name customScript \
+  --publisher Microsoft.Azure.Extensions \
+  --settings '{"fileUris":["https://raw.githubusercontent.com/MicrosoftDocs/mslearn-add-and-size-disks-in-azure-virtual-machines/master/add-data-disk.sh"]}' \
+  --protected-settings '{"commandToExecute": "./add-data-disk.sh"}'
+
+ssh azureuser@$ipaddress lsblk
+
+# NAME    MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+# sda       8:0    0   30G  0 disk
+# +-sda1    8:1    0 29.9G  0 part /
+# +-sda14   8:14   0    4M  0 part
+# +-sda15   8:15   0  106M  0 part /boot/efi
+# sdb       8:16   0    7G  0 disk
+# +-sdb1    8:17   0    7G  0 part /mnt
+# sdc       8:32   0   64G  0 disk
+# +-sdc1    8:33   0   64G  0 part /uploads
+# sr0      11:0    1  628K  0 rom
+
+
+# Resize a Disk. Can only go up not down
+# Run az disk list to print the list of the managed disks in the resource group. 
+
+az disk list \
+  --query '[*].{Name:name,Gb:diskSizeGb,Tier:sku.tier}' \
+  --output table
+
+az vm deallocate --name support-web-vm01
+az disk update --name uploadDataDisk1 --size-gb 128
+az vm start --name support-web-vm01
+
+# Since the machine was deallocated we may need to public IP again
+ipaddress=$(az vm show --name support-web-vm01 -d --query [publicIps] --o tsv)
+
+ssh azureuser@$ipaddress lsblk
+
+# Still shows 64GB
+# NAME    MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT
+# sda       8:0    0   30G  0 disk
+# +-sda1    8:1    0 29.9G  0 part /
+# +-sda14   8:14   0    4M  0 part
+# +-sda15   8:15   0  106M  0 part /boot/efi
+# sdb       8:16   0    7G  0 disk
+# +-sdb1    8:17   0    7G  0 part /mnt
+# sdc       8:32   0  128G  0 disk
+# +-sdc1    8:33   0   64G  0 part /uploads
+
+# The script: Unmounts the disk /dev/sdc1. Resizes partition 1 to be 128 GB. Verifies partition consistency. Resizes the filesystem. Remounts the drive /dev/sdc1 back to the mount point /uploads.
+az vm extension set \
+  --vm-name support-web-vm01 \
+  --name customScript \
+  --publisher Microsoft.Azure.Extensions \
+  --settings '{"fileUris":["https://raw.githubusercontent.com/MicrosoftDocs/mslearn-add-and-size-disks-in-azure-virtual-machines/master/resize-data-disk.sh"]}' \
+  --protected-settings '{"commandToExecute": "./resize-data-disk.sh"}'
+
+ssh azureuser@$ipaddress lsblk
+
+# Now shows 128GB
+# NAME    MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+# sda       8:0    0    30G  0 disk
+# +-sda1    8:1    0  29.9G  0 part /
+# +-sda14   8:14   0     4M  0 part
+# +-sda15   8:15   0   106M  0 part /boot/efi
+# sdb       8:16   0     7G  0 disk
+# +-sdb1    8:17   0     7G  0 part /mnt
+# sdc       8:32   0   128G  0 disk
+# +-sdc1    8:33   0 119.2G  0 part /uploads
+
+ssh azureuser@$ipaddress df -h
+
+# Filesystem      Size  Used Avail Use% Mounted on
+# udev            1.7G     0  1.7G   0% /dev
+# tmpfs           342M  668K  342M   1% /run
+# /dev/sda1        29G  2.1G   27G   8% /
+# tmpfs           1.7G     0  1.7G   0% /dev/shm
+# tmpfs           5.0M     0  5.0M   0% /run/lock
+# tmpfs           1.7G     0  1.7G   0% /sys/fs/cgroup
+# /dev/sda15      105M  3.6M  101M   4% /boot/efi
+# /dev/sdb1       6.9G   32M  6.5G   1% /mnt
+# /dev/sdc1       118G   60M  112G   1% /uploads
+# tmpfs           342M     0  342M   0% /run/user/1000
